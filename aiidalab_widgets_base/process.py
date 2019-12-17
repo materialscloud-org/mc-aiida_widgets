@@ -12,19 +12,14 @@ def get_running_calcs(process):
 
     from aiida.orm import CalcJobNode, ProcessNode, WorkChainNode
 
-    # If a process is a running calculation - returning it
-    if issubclass(type(process), CalcJobNode) and not process.is_sealed:
-        return [process]
-
-    # If the process is a running work chain - returning its children
-    if issubclass(type(process), WorkChainNode) and not process.is_sealed:
-        calcs = []
+    if process.is_sealed:
+        pass  # nothing to yield
+    elif isinstance(process, CalcJobNode):
+        yield process
+    elif isinstance(process, WorkChainNode):
         for link in process.get_outgoing():
-            if issubclass(type(link.node), ProcessNode) and not link.node.is_sealed:
-                calcs += get_running_calcs(link.node)
-        return calcs
-    # if it is neither calculation, nor work chain - returninng None
-    return []
+            if isinstance(link.node, ProcessNode) and not link.node.is_sealed:
+                yield from get_running_calcs(link.node)
 
 
 class SubmitButtonWidget(VBox):
@@ -109,7 +104,7 @@ class ProcessFollowerWidget(VBox):
 class ProgressBarWidget(VBox):
     """A bar showing the proggress of a process."""
 
-    def __init__(self, process, **kwargs):
+    def __init__(self, process=None, **kwargs):
         from ipywidgets import HTML, IntProgress, Layout
 
         self.process = process
@@ -175,11 +170,9 @@ class RunningCalcJobOutputWidget(Textarea):
 
     def update(self):
         """Update the displayed output."""
-        calcs = get_running_calcs(self.main_process)
-        if calcs:
-            for calc in calcs:
-                if calc.id == self.previous_calc_id:
-                    break
+        for calc in get_running_calcs(self.main_process):
+            if calc.id == self.previous_calc_id:
+                break
             else:
                 self.output = []
                 self.previous_calc_id = calc.id
