@@ -21,6 +21,29 @@ def valid_aiidacode_args(arguments):
     return valid_arguments(arguments, VALID_AIIDA_CODE_SETUP_ARGUMETNS)
 
 
+class SetupCodeLink(ipw.HTML):
+    """Link to notebook for setting up codes."""
+
+    description = traitlets.Unicode()
+    disabled = traitlets.Bool()
+
+    def __init__(self, path_to_root, input_plugin, description='Setup new code'):
+        self.path_to_root = path_to_root
+        self.input_plugin = input_plugin
+        self.description = description
+        super().__init__()
+
+    @traitlets.observe('disabled', 'description')
+    def _observe_disabled(self, change):  # pylint:disable=unused-argument
+        with self.hold_trait_notifications():
+            if self.disabled:
+                self.value = self.description
+            else:
+                self.value = '<a href={self.path_to_root}aiidalab-widgets-base/setup_code.ipynb?'\
+                             'label={self.input_plugin}&plugin={self.input_plugin} '\
+                             'target="_blank">{self.description}</a>'.format(self=self)
+
+
 class CodeDropdown(ipw.VBox):
     """Code selection widget."""
 
@@ -42,12 +65,10 @@ class CodeDropdown(ipw.VBox):
         self._btn_refresh = ipw.Button(description="Refresh", layout=ipw.Layout(width="70px"))
         self._btn_refresh.on_click(self.refresh)
         # FOR LATER: use base_url here, when it will be implemented in the appmode.
-        self._setup_another = ipw.HTML(value="""<a href={path_to_root}aiidalab-widgets-base/setup_code.ipynb?
-                      label={label}&plugin={plugin} target="_blank">Setup new code</a>""".format(
-            path_to_root=path_to_root, label=input_plugin, plugin=input_plugin))
+        self._setup_code_link = SetupCodeLink(path_to_root, input_plugin)
         self.output = ipw.Output()
 
-        children = [ipw.HBox([self.dropdown, self._btn_refresh, self._setup_another]), self.output]
+        children = [ipw.HBox([self.dropdown, self._btn_refresh, self._setup_code_link]), self.output]
 
         super(CodeDropdown, self).__init__(children=children, **kwargs)
 
@@ -110,7 +131,7 @@ class CodeDropdown(ipw.VBox):
         with self.hold_trait_notifications():
             self.dropdown.disabled = change['new']
             self._btn_refresh.disabled = change['new']
-            self._setup_another.disabled = change['new']
+            self._setup_code_link.disabled = change['new']
 
 
 class AiiDACodeSetup(ipw.VBox):
