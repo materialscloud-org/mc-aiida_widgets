@@ -4,6 +4,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from subprocess import check_output
 
+import traitlets
 import ipywidgets as ipw
 from IPython.display import clear_output
 
@@ -23,6 +24,8 @@ def valid_aiidacode_args(arguments):
 class CodeDropdown(ipw.VBox):
     """Code selection widget."""
 
+    disabled = traitlets.Bool()
+
     def __init__(self, input_plugin, text='Select code:', path_to_root='../', **kwargs):
         """ Dropdown for Codes for one input plugin.
 
@@ -35,7 +38,7 @@ class CodeDropdown(ipw.VBox):
         self.input_plugin = input_plugin
         self.codes = {}
 
-        self.dropdown = ipw.Dropdown(description=text, disabled=True)
+        self.dropdown = ipw.Dropdown(description=text)
         self._btn_refresh = ipw.Button(description="Refresh", layout=ipw.Layout(width="70px"))
         self._btn_refresh.on_click(self.refresh)
         # FOR LATER: use base_url here, when it will be implemented in the appmode.
@@ -101,6 +104,13 @@ class CodeDropdown(ipw.VBox):
             return self.codes[self.dropdown.value]
         except KeyError:
             return None
+
+    @traitlets.observe('disabled')
+    def _observe_disabled(self, change):
+        with self.hold_trait_notifications():
+            self.dropdown.disabled = change['new']
+            self._btn_refresh.disabled = change['new']
+            self._setup_another.disabled = change['new']
 
 
 class AiiDACodeSetup(ipw.VBox):
