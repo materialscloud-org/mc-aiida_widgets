@@ -7,7 +7,7 @@ import datetime
 from collections import OrderedDict
 import numpy as np
 import ipywidgets as ipw
-from traitlets import Instance, Unicode, Union, link, default, observe, validate
+from traitlets import Instance, Bool, Unicode, Union, link, dlink, default, observe, validate
 
 # ASE imports
 from ase import Atom, Atoms
@@ -32,6 +32,7 @@ class StructureManagerWidget(ipw.VBox):
     structure = Union([Instance(Atoms), Instance(Data)], allow_none=True)
     structure_node = Instance(Data, allow_none=True, read_only=True)
     node_class = Unicode()
+    disabled = Bool()
 
     SUPPORTED_DATA_FORMATS = {'CifData': 'cif', 'StructureData': 'structure'}
 
@@ -85,6 +86,10 @@ class StructureManagerWidget(ipw.VBox):
                 # Labeling tabs.
                 self._structure_sources_tab.set_title(i, label)
                 link((self, 'structure'), (importer, 'structure'))
+
+        # Enable disabling importers via the container's 'disabled' traitlet.
+        for _, importer in importers:
+            dlink((self, 'disabled'), (importer, 'disabled'))
 
         # Store button, store class selector, description.
         store_and_description = []
@@ -200,6 +205,7 @@ class StructureManagerWidget(ipw.VBox):
 class StructureUploadWidget(ipw.VBox):
     """Class that allows to upload structures from user's computer."""
     structure = Instance(Atoms, allow_none=True)
+    disabled = Bool()
 
     def __init__(self, text="Upload Structure"):
         self.file_path = None
@@ -209,6 +215,7 @@ class StructureUploadWidget(ipw.VBox):
         Supported structure formats
         </a>""")
         self.file_upload.observe(self._on_file_upload, names='value')
+        dlink((self, 'disabled'), (self.file_upload, 'disabled'))
         super().__init__(children=[self.file_upload, supported_formats])
 
     def _on_file_upload(self, change):  # pylint: disable=unused-argument
@@ -233,11 +240,15 @@ class StructureUploadWidget(ipw.VBox):
 class StructureExamplesWidget(ipw.VBox):
     """Class to provide example structures for selection."""
     structure = Instance(Atoms, allow_none=True)
+    disabled = Bool()
 
     def __init__(self, examples, **kwargs):
         self.on_structure_selection = lambda structure_ase, name: None
         self._select_structure = ipw.Dropdown(options=self.get_example_structures(examples))
         self._select_structure.observe(self._on_select_structure, names=['value'])
+
+        dlink((self, 'disabled'), (self._select_structure, 'disabled'))
+
         super().__init__(children=[self._select_structure], **kwargs)
 
     @staticmethod
@@ -260,6 +271,7 @@ class StructureExamplesWidget(ipw.VBox):
 class StructureBrowserWidget(ipw.VBox):
     """Class to query for structures stored in the AiiDA database."""
     structure = Union([Instance(Atoms), Instance(Data)], allow_none=True)
+    disabled = Bool()
 
     def __init__(self):
 
@@ -275,15 +287,17 @@ class StructureBrowserWidget(ipw.VBox):
                                        style={'description_width': '120px'},
                                        layout={'width': '50%'})
         self.drop_label.observe(self.search, names='value')
+        dlink((self, 'disabled'), (self.drop_label, 'disabled'))
 
         # Disable process labels selection if we are not looking for the calculated structures.
         def disable_drop_label(change):
-            self.drop_label.disabled = not change['new'] == 'calculated'
+            self.drop_label.disabled = self.disabled or change['new'] != 'calculated'
 
         # Select structures kind.
         self.mode = ipw.RadioButtons(options=['all', 'uploaded', 'edited', 'calculated'], layout={'width': '25%'})
         self.mode.observe(self.search, names='value')
         self.mode.observe(disable_drop_label, names='value')
+        dlink((self, 'disabled'), (self.mode, 'disabled'))
 
         # Date range.
         # Note: there is Date picker widget, but it currently does not work in Safari:
@@ -291,6 +305,8 @@ class StructureBrowserWidget(ipw.VBox):
         date_text = ipw.HTML(value='<p>Select the date range:</p>')
         self.start_date_widget = ipw.Text(value='', description='From: ', style={'description_width': '120px'})
         self.end_date_widget = ipw.Text(value='', description='To: ')
+        dlink((self, 'disabled'), (self.start_date_widget, 'disabled'))
+        dlink((self, 'disabled'), (self.end_date_widget, 'disabled'))
 
         # Search button.
         btn_search = ipw.Button(description='Search',
@@ -300,6 +316,7 @@ class StructureBrowserWidget(ipw.VBox):
                                     'margin': '2px 0 0 2em'
                                 })
         btn_search.on_click(self.search)
+        dlink((self, 'disabled'), (btn_search, 'disabled'))
 
         age_selection = ipw.VBox(
             [date_text, ipw.HBox([self.start_date_widget, self.end_date_widget, btn_search])],
@@ -312,8 +329,10 @@ class StructureBrowserWidget(ipw.VBox):
         box = ipw.VBox([age_selection, h_line, ipw.HBox([self.mode, self.drop_label])])
 
         self.results = ipw.Dropdown(layout={'width': '900px'})
-        self.results.observe(self._on_select_structure)
+        self.results.observe(self._on_select_structure, names='value')
+        dlink((self, 'disabled'), (self.results, 'disabled'))
         self.search()
+
         super().__init__([box, h_line, self.results])
 
     def preprocess(self):
@@ -403,6 +422,7 @@ class StructureBrowserWidget(ipw.VBox):
 class SmilesWidget(ipw.VBox):
     """Conver SMILES into 3D structure."""
     structure = Instance(Atoms, allow_none=True)
+    disabled = Bool()
 
     SPINNER = """<i class="fa fa-spinner fa-pulse" style="color:red;" ></i>"""
 
@@ -416,8 +436,10 @@ class SmilesWidget(ipw.VBox):
             return
 
         self.smiles = ipw.Text()
+        dlink((self, 'disabled'), (self.smiles, 'disabled'))
         self.create_structure_btn = ipw.Button(description="Generate molecule", button_style='info')
         self.create_structure_btn.on_click(self._on_button_pressed)
+        dlink((self, 'disabled'), (self.create_structure_btn, 'disabled'))
         self.output = ipw.HTML("")
         super().__init__([self.smiles, self.create_structure_btn, self.output])
 

@@ -1,6 +1,6 @@
 """Widgets that allow to query online databases."""
 import ipywidgets as ipw
-from traitlets import Instance, default
+from traitlets import Instance, Bool, default, dlink
 from ase import Atoms
 
 from aiida.tools.dbimporters.plugins.cod import CodDbImporter
@@ -12,6 +12,7 @@ class CodQueryWidget(ipw.VBox):
     :ivar structure(Atoms): trait that contains the selected structure, None if structure is not selected.'''
 
     structure = Instance(Atoms, allow_none=True)
+    disabled = Bool()
 
     def __init__(self, **kwargs):
         description = ipw.HTML("""<h3>Get crystal structures from
@@ -40,6 +41,8 @@ class CodQueryWidget(ipw.VBox):
                                      layout=layout,
                                      style=style)
         self.btn_query = ipw.Button(description='Query')
+        dlink((self, 'disabled'), (self.btn_query, 'disabled'))
+
         self.query_message = ipw.HTML("Waiting for input...")
         self.drop_structure = ipw.Dropdown(description="",
                                            options=[("select structure", {
@@ -47,6 +50,8 @@ class CodQueryWidget(ipw.VBox):
                                            })],
                                            style=style,
                                            layout=layout)
+        dlink((self, 'disabled'), (self.drop_structure, 'disabled'))
+
         self.link = ipw.HTML("Link to the web-page will appear here")
         self.btn_query.on_click(self._on_click_query)
         self.drop_structure.observe(self._on_select_structure, names=['value'])
