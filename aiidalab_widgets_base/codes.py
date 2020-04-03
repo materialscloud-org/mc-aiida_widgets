@@ -43,6 +43,9 @@ class CodeDropdown(ipw.VBox):
         :type text: str
         """
 
+        self._description = ipw.Label(
+            'Select one of the configured AiiDA codes to execute the calculation or setup a new one.')
+
         self.input_plugin = input_plugin
         self.output = ipw.Output()
 
@@ -58,9 +61,12 @@ class CodeDropdown(ipw.VBox):
                       label={label}&plugin={plugin} target="_blank">Setup new code</a>""".format(
             path_to_root=path_to_root, label=input_plugin, plugin=input_plugin))
 
-        children = [ipw.HBox([self.dropdown, self._btn_refresh, self._setup_another]), self.output]
-
-        super().__init__(children=children, **kwargs)
+        super().__init__(children=[
+            self._description,
+            ipw.HBox(children=[self.dropdown, self._btn_refresh]),
+            self._setup_another,
+            self.output],
+            **kwargs)
 
         self.refresh()
 
