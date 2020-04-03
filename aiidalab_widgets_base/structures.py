@@ -202,22 +202,27 @@ class StructureUploadWidget(ipw.VBox):
     structure = Instance(Atoms, allow_none=True)
 
     def __init__(self, text="Upload Structure"):
-        from fileupload import FileUploadWidget
-
         self.file_path = None
-        self.file_upload = FileUploadWidget(text)
+        self.file_upload = ipw.FileUpload(description=text, layout=ipw.Layout(width='200px'))
         supported_formats = ipw.HTML(
             """<a href="https://wiki.fysik.dtu.dk/ase/_modules/ase/io/formats.html" target="_blank">
         Supported structure formats
         </a>""")
-        self.file_upload.observe(self._on_file_upload, names='data')
+        self.file_upload.observe(self._on_file_upload, names='value')
         super().__init__(children=[self.file_upload, supported_formats])
 
     def _on_file_upload(self, change):  # pylint: disable=unused-argument
         """When file upload button is pressed."""
-        self.file_path = os.path.join(tempfile.mkdtemp(), self.file_upload.filename)
-        with open(self.file_path, 'w') as fobj:
-            fobj.write(self.file_upload.data.decode("utf-8"))
+        assert change['name'] == 'value'
+        assert len(change['new']) == 1
+
+        new_file = list(change['new'].values())[0]
+        filename = new_file['metadata']['name']
+        content = new_file['content']
+
+        self.file_path = os.path.join(tempfile.mkdtemp(), filename)
+        with open(self.file_path, 'wb') as fobj:
+            fobj.write(content)
         self.structure = get_ase_from_file(self.file_path)
 
     @default('structure')
