@@ -4,7 +4,7 @@ from subprocess import check_output
 
 import ipywidgets as ipw
 from IPython.display import clear_output
-from traitlets import Dict, Instance, Unicode, Union, link, validate
+from traitlets import Bool, Dict, Instance, Unicode, Union, dlink, link, validate
 
 from aiida.orm import Code, QueryBuilder, User
 
@@ -33,6 +33,7 @@ class CodeDropdown(ipw.VBox):
     """
     selected_code = Union([Unicode(), Instance(Code)], allow_none=True)
     codes = Dict(allow_none=True)
+    disabled = Bool()
 
     def __init__(self, input_plugin, text='Select code:', path_to_root='../', **kwargs):
         """Dropdown for Codes for one input plugin.
@@ -49,9 +50,10 @@ class CodeDropdown(ipw.VBox):
         self.input_plugin = input_plugin
         self.output = ipw.Output()
 
-        self.dropdown = ipw.Dropdown(optionsdescription=text, disabled=True, value=None)
+        self.dropdown = ipw.Dropdown(optionsdescription=text)
         link((self, 'codes'), (self.dropdown, 'options'))
         link((self.dropdown, 'value'), (self, 'selected_code'))
+        dlink((self, 'disabled'), (self.dropdown, 'disabled'))
 
         self._btn_refresh = ipw.Button(description="Refresh", layout=ipw.Layout(width="70px"))
         self._btn_refresh.on_click(self.refresh)
@@ -106,12 +108,6 @@ class CodeDropdown(ipw.VBox):
             clear_output()
             with self.hold_trait_notifications():
                 self.dropdown.options = self._get_codes()
-            if not self.dropdown.options:
-                print("No codes found for input plugin '{}'.".format(self.input_plugin))
-                self.dropdown.disabled = True
-            else:
-                self.dropdown.disabled = False
-            self.dropdown.value = None
 
     @validate('selected_code')
     def _validate_selected_code(self, change):
