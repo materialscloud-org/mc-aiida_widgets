@@ -7,7 +7,7 @@ from .computers import SshComputerSetup
 from .computers import AiidaComputerSetup
 from .codes import CodeDropdown, AiiDACodeSetup
 from .computers import ComputerDropdown
-from .databases import CodQueryWidget, OptimadeQueryWidget
+from .databases import CodQueryWidget, ComputerDatabaseWidget, OptimadeQueryWidget
 from .export import ExportButtonWidget
 from .process import ProgressBarWidget, ProcessFollowerWidget, ProcessInputsWidget, ProcessOutputsWidget
 from .process import ProcessCallStackWidget, RunningCalcJobOutputWidget, SubmitButtonWidget, ProcessReportWidget

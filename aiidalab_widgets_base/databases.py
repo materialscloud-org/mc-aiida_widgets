@@ -1,6 +1,7 @@
 """Widgets that allow to query online databases."""
+import requests
 import ipywidgets as ipw
-from traitlets import Instance, default
+from traitlets import Instance, Int, Unicode, default
 from ase import Atoms
 
 from optimade_client.query_filter import OptimadeQueryFilterWidget
@@ -162,3 +163,59 @@ class OptimadeQueryWidget(ipw.VBox):
     def _update_structure(self, change: dict) -> None:
         """New structure chosen"""
         self.structure = change['new'].as_ase if change['new'] else None
+
+
+class ComputerDatabaseWidget(ipw.HBox):
+    """Extract setup of a known computer from the AiiDA code registry."""
+    label = Unicode()
+    hostname = Unicode()
+    description = Unicode()
+    transport = Unicode()
+    scheduler = Unicode()
+    shebang = Unicode()
+    work_dir = Unicode()
+    mpirun_command = Unicode()
+    mpiprocs_per_machine = Int()
+    prepend_text = Unicode()
+    append_text = Unicode()
+    num_cores_per_mpiproc = Int()
+    queue_name = Unicode()
+    proxy_hostname = Unicode()
+    proxy_username = Unicode()
+
+    def __init__(self, **kwargs):
+        self.database = {}
+        self.domain = ipw.Select(
+            options=[],
+            description='Domain',
+            disabled=False,
+        )
+        self.domain.observe(self.update_computers, names=['value', 'options'])
+
+        self.computer = ipw.Select(
+            options=[],
+            description="Computer:",
+            disable=False,
+        )
+        self.computer.observe(self.update_settings, names=['value', 'options'])
+        self.update_btn = ipw.Button(description="Pull database")
+        self.update_btn.on_click(self.update)
+        super().__init__(children=[self.domain, self.computer, self.update_btn], **kwargs)
+
+    def update(self, _=None):
+        self.database = requests.get("https://aiidateam.github.io/aiida-code-registry/database.json").json()
+        self.domain.options = self.database.keys()
+
+    def update_computers(self, _=None):
+        self.computer.options = [key for key in self.database[self.domain.value].keys() if key != "default"]
+        self.computer.value = None  # This is a hack to make sure the selected computer appears as selected.
+        self.computer.value = self.database[self.domain.value]["default"]
+
+    def update_settings(self, _=None):
+        """Read settings from the YAML files and populate self.database with them."""
+        if self.domain.value is None or self.computer.value is None:
+            return
+        computer_code_settings = self.database[self.domain.value][self.computer.value]
+        computer_setup = computer_code_settings['computer-setup.yml']
+        for setting in computer_setup:
+            self.set_trait(setting, computer_setup[setting])
