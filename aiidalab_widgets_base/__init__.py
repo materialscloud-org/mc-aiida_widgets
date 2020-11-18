@@ -3,9 +3,9 @@
 from aiida import load_profile
 load_profile()
 
-from .codes import CodeDropdown, AiiDACodeSetup, valid_aiidacode_args
 from .computers import SshComputerSetup
 from .computers import AiidaComputerSetup
+from .codes import CodeDropdown, AiiDACodeSetup
 from .computers import ComputerDropdown
 from .databases import CodQueryWidget, OptimadeQueryWidget
 from .export import ExportButtonWidget
