@@ -1,7 +1,7 @@
 """Widgets that allow to query online databases."""
 import requests
 import ipywidgets as ipw
-from traitlets import Instance, Int, Unicode, default
+from traitlets import Bool, Float, Instance, Int, Unicode, default, validate
 from ase import Atoms
 
 from optimade_client.query_filter import OptimadeQueryFilterWidget
@@ -167,6 +167,7 @@ class OptimadeQueryWidget(ipw.VBox):
 
 class ComputerDatabaseWidget(ipw.HBox):
     """Extract setup of a known computer from the AiiDA code registry."""
+    # Verdi computer setup.
     label = Unicode()
     hostname = Unicode()
     description = Unicode()
@@ -180,8 +181,15 @@ class ComputerDatabaseWidget(ipw.HBox):
     append_text = Unicode()
     num_cores_per_mpiproc = Int()
     queue_name = Unicode()
+
+    # Verdi computer configure.
+    port = Int()
+    allow_agent = Bool()
+    safe_interval = Float()
+    use_login_shell = Bool()
     proxy_hostname = Unicode()
     proxy_username = Unicode()
+    proxy_command = Unicode()
 
     def __init__(self, **kwargs):
         self.database = {}
@@ -216,6 +224,20 @@ class ComputerDatabaseWidget(ipw.HBox):
         if self.domain.value is None or self.computer.value is None:
             return
         computer_code_settings = self.database[self.domain.value][self.computer.value]
-        computer_setup = computer_code_settings['computer-setup.yml']
+
+        computer_setup = computer_code_settings['computer-setup']
         for setting in computer_setup:
             self.set_trait(setting, computer_setup[setting])
+        if 'computer-configure' in computer_code_settings:
+            computer_configure = computer_code_settings['computer-configure']
+            for setting in computer_configure:
+                self.set_trait(setting, computer_configure[setting])
+
+    @validate('proxy_command')
+    def _validate_proxy_command(self, change):
+        """Extrac username and hostname for connecting to a proxy server."""
+        command = change['value']
+        username, hostname = ''.join([w for w in command.split() if '@' in w]).split('@')
+        with self.hold_trait_notifications():
+            self.proxy_username = username
+            self.proxy_hostname = hostname
