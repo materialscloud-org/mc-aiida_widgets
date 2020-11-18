@@ -6,7 +6,7 @@ import ipywidgets as ipw
 from IPython.display import clear_output
 from traitlets import Bool, Dict, Instance, Unicode, Union, dlink, link, validate
 
-from aiida.orm import Code, QueryBuilder, User
+from aiida.orm import Code, Computer, QueryBuilder, User
 from aiida.plugins.entry_point import get_entry_point_names
 from aiidalab_widgets_base.computers import ComputerDropdown
 
@@ -140,7 +140,8 @@ class CodeDropdown(ipw.VBox):
 class AiiDACodeSetup(ipw.VBox):
     """Class that allows to setup AiiDA code"""
     label = Unicode()
-    computer = Unicode()
+    computer = Union([Unicode(), Instance(Computer)], allow_none=True)
+
     input_plugin = Unicode()
     description = Unicode()
     remote_abs_path = Unicode()
@@ -155,9 +156,9 @@ class AiiDACodeSetup(ipw.VBox):
         inp_label = ipw.Text(description="AiiDA code label:", layout=ipw.Layout(width="500px"), style=style)
         link((inp_label, 'value'), (self, 'label'))
 
-        # Computer on which the code is installed.
+        # Computer on which the code is installed. Two dlinks are needed to make sure we get a Computer instance.
         inp_computer = ComputerDropdown(layout={'margin': '0px 0px 0px 125px'})
-        dlink((inp_computer, 'label'), (self, 'computer'))
+        dlink((inp_computer, 'selected_computer'), (self, 'computer'))
         dlink((self, 'computer'), (inp_computer, 'selected_computer'))
 
         # Code plugin.
