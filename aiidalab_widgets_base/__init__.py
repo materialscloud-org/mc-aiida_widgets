@@ -4,8 +4,8 @@ from aiida import load_profile
 load_profile()
 
 from .codes import CodeDropdown, AiiDACodeSetup, valid_aiidacode_args
-from .computers import SshComputerSetup, valid_sshcomputer_args
-from .computers import AiidaComputerSetup, valid_aiidacomputer_args
+from .computers import SshComputerSetup
+from .computers import AiidaComputerSetup
 from .computers import ComputerDropdown
 from .databases import CodQueryWidget, OptimadeQueryWidget
 from .export import ExportButtonWidget
