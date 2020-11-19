@@ -744,19 +744,19 @@ class ComputerDropdown(ipw.VBox):
     def _validate_selected_computer(self, change):
         """Select computer either by name or by class instance."""
         computer = change['value']
+        with self.output:
+            clear_output()
+            if not computer:
+                return None
+            if isinstance(computer, str):
+                if computer in self.computers:
+                    return self.computers[computer]
+                print(f"No computer named '{computer}' was found in AiiDA database.")
 
-        if not computer:
-            return None
-        if isinstance(computer, str):
-            if computer in self.computers:
-                return self.computers[computer]
-            raise KeyError(f"No computer named '{computer}' was found in AiiDA database.")
+            if isinstance(computer, Computer):
+                if computer.name in self.computers:
+                    return computer
+                print(f"The computer instance '{computer}' supplied was not found in  the AiiDA database. "
+                      "Consider reloading")
 
-        if isinstance(computer, Computer):
-            if computer.name in self.computers:
-                return computer
-            raise ValueError(f"The computer instance '{computer}' supplied was not found in  the AiiDA database. "
-                             "Consider reloading")
-
-        # This place will never be reached, because the trait's type is checked before validation.
         return None
