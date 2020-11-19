@@ -166,7 +166,7 @@ class OptimadeQueryWidget(ipw.VBox):
 
 
 class ComputerDatabaseWidget(ipw.HBox):
-    """Extract setup of a known computer from the AiiDA code registry."""
+    """Extract the setup of a known computer from the AiiDA code registry."""
     # Verdi computer setup.
     label = Unicode()
     hostname = Unicode()
@@ -193,22 +193,23 @@ class ComputerDatabaseWidget(ipw.HBox):
 
     def __init__(self, **kwargs):
         self.database = {}
-        self.domain = ipw.Select(
+        self.update_btn = ipw.Button(description="Pull database")
+        self.update_btn.on_click(self.update)
+        self.domain = ipw.Dropdown(
             options=[],
             description='Domain',
             disabled=False,
         )
         self.domain.observe(self.update_computers, names=['value', 'options'])
 
-        self.computer = ipw.Select(
+        self.computer = ipw.Dropdown(
             options=[],
             description="Computer:",
             disable=False,
         )
         self.computer.observe(self.update_settings, names=['value', 'options'])
-        self.update_btn = ipw.Button(description="Pull database")
-        self.update_btn.on_click(self.update)
-        super().__init__(children=[self.domain, self.computer, self.update_btn], **kwargs)
+
+        super().__init__(children=[self.update_btn, self.domain, self.computer], **kwargs)
 
     def update(self, _=None):
         self.database = requests.get("https://aiidateam.github.io/aiida-code-registry/database.json").json()
@@ -223,13 +224,13 @@ class ComputerDatabaseWidget(ipw.HBox):
         """Read settings from the YAML files and populate self.database with them."""
         if self.domain.value is None or self.computer.value is None:
             return
-        computer_code_settings = self.database[self.domain.value][self.computer.value]
 
-        computer_setup = computer_code_settings['computer-setup']
+        computer_settings = self.database[self.domain.value][self.computer.value]
+        computer_setup = computer_settings['computer-setup']
         for setting in computer_setup:
             self.set_trait(setting, computer_setup[setting])
-        if 'computer-configure' in computer_code_settings:
-            computer_configure = computer_code_settings['computer-configure']
+        if 'computer-configure' in computer_settings:
+            computer_configure = computer_settings['computer-configure']
             for setting in computer_configure:
                 self.set_trait(setting, computer_configure[setting])
 
@@ -241,3 +242,72 @@ class ComputerDatabaseWidget(ipw.HBox):
         with self.hold_trait_notifications():
             self.proxy_username = username
             self.proxy_hostname = hostname
+
+
+class CodeDatabaseWidget(ipw.HBox):
+    """Extract the setup of a known computer from the AiiDA code registry."""
+    label = Unicode()
+    description = Unicode()
+    input_plugin = Unicode()
+    on_computer = Bool()
+    remote_abs_path = Unicode()
+    computer = Unicode()
+    prepend_text = Unicode()
+    append_text = Unicode()
+
+    def __init__(self, **kwargs):
+        self.database = {}
+
+        # Select domain.
+        self.inp_domain = ipw.Dropdown(
+            options=[],
+            description='Domain',
+            disabled=False,
+        )
+        self.inp_domain.observe(self.update_computers, names=['value', 'options'])
+
+        # Select computer.
+        self.inp_computer = ipw.Dropdown(
+            options=[],
+            description="Computer:",
+            disable=False,
+        )
+        self.inp_computer.observe(self.update_codes, names=['value', 'options'])
+
+        # Select code.
+        self.inp_code = ipw.Dropdown(
+            options=[],
+            description="Code:",
+            disable=False,
+        )
+        self.inp_code.observe(self.update_settings, names=['value', 'options'])
+
+        self.update_btn = ipw.Button(description="Pull database")
+        self.update_btn.on_click(self.update)
+        super().__init__(children=[self.update_btn, self.inp_domain, self.inp_computer, self.inp_code], **kwargs)
+
+    def update(self, _=None):
+        self.database = requests.get("https://aiidateam.github.io/aiida-code-registry/database.json").json()
+        self.inp_domain.options = self.database.keys()
+
+    def update_computers(self, _=None):
+        self.inp_computer.options = [key for key in self.database[self.inp_domain.value].keys() if key != "default"]
+        self.inp_computer.value = None  # This is a hack to make sure the selected computer appears as selected.
+        self.inp_computer.value = self.database[self.inp_domain.value]["default"]
+
+    def update_codes(self, _=None):
+        """Read settings from the YAML files and populate self.database with them."""
+        if self.inp_domain.value is None or self.inp_computer.value is None:
+            return
+        self.inp_code.options = [
+            key for key in self.database[self.inp_domain.value][self.inp_computer.value].keys()
+            if key not in ('computer-setup', 'computer-configure')
+        ]
+
+    def update_settings(self, _=None):
+        """Update code settings."""
+        if self.inp_domain.value is None or self.inp_computer.value is None or self.inp_code.value is None:
+            return
+        settings = self.database[self.inp_domain.value][self.inp_computer.value][self.inp_code.value]
+        for key, value in settings.items():
+            self.set_trait(key, value)
