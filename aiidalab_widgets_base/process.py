@@ -145,18 +145,21 @@ class ProcessInputsWidget(ipw.VBox):
     process = Instance(ProcessNode, allow_none=True)
 
     def __init__(self, process=None, **kwargs):
-        self.process = process
+
         self.output = ipw.Output()
         self.info = ipw.HTML()
-        inputs_list = [(l.title(), l) for l in self.process.inputs] if self.process else []
-        inputs = ipw.Dropdown(
-            options=[('Select input', '')] + inputs_list,
+        self.inputs = ipw.Dropdown(
+            options=[('Select input', '')],
             description='Select input:',
             style={'description_width': 'initial'},
             disabled=False,
         )
-        inputs.observe(self.show_selected_input, names=['value'])
-        super().__init__(children=[ipw.HBox([inputs, self.info]), self.output], **kwargs)
+        self.process = process
+        self.update(process)
+        self.inputs.observe(self.show_selected_input, names=['value'])
+        super().__init__(
+            children=[ipw.HBox([self.inputs, self.info]), self.output],
+            **kwargs)
 
     def show_selected_input(self, change=None):
         """Function that displays process inputs selected in the `inputs` Dropdown widget."""
@@ -168,25 +171,38 @@ class ProcessInputsWidget(ipw.VBox):
                 self.info.value = "PK: {}".format(selected_input.id)
                 display(viewer(selected_input))
 
+    def update(self, process):
+        inputs_list = [(l.title(), l)
+                        for l in process.outputs] if process else []
+        self.inputs.options = [('Select input', '')] + inputs_list
+
+    @observe('process')
+    def _observe_process(self, change):
+        process = change['new']
+        self.update(process)
+
 
 class ProcessOutputsWidget(ipw.VBox):
     """Widget to select and show process outputs."""
     process = Instance(ProcessNode, allow_none=True)
 
     def __init__(self, process=None, **kwargs):
-        self.process = process
         self.output = ipw.Output()
         self.info = ipw.HTML()
-        outputs_list = [(l.title(), l) for l in self.process.outputs] if self.process else []
-        outputs = ipw.Dropdown(
-            options=[('Select output', '')] + outputs_list,
+        self.outputs = ipw.Dropdown(
+            options=[('Select output', '')],
             label='Select output',
             description='Select outputs:',
             style={'description_width': 'initial'},
             disabled=False,
         )
-        outputs.observe(self.show_selected_output, names=['value'])
-        super().__init__(children=[ipw.HBox([outputs, self.info]), self.output], **kwargs)
+        self.process = process
+        self.update(process)
+
+        self.outputs.observe(self.show_selected_output, names=['value'])
+        super().__init__(
+            children=[ipw.HBox([self.outputs, self.info]), self.output],
+            **kwargs)
 
     def show_selected_output(self, change=None):
         """Function that displays process output selected in the `outputs` Dropdown widget."""
@@ -197,6 +213,16 @@ class ProcessOutputsWidget(ipw.VBox):
                 selected_output = self.process.outputs[change['new']]
                 self.info.value = "PK: {}".format(selected_output.id)
                 display(viewer(selected_output))
+
+    def update(self, process):
+        outputs_list = [(l.title(), l)
+                        for l in process.outputs] if process else []
+        self.outputs.options = [('Select output', '')] + outputs_list
+
+    @observe('process')
+    def _observe_process(self, change):
+        process = change['new']
+        self.update(process)
 
 
 class ProcessFollowerWidget(ipw.VBox):
