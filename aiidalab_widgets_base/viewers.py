@@ -606,6 +606,98 @@ class StructureDataViewer(_StructureDataBaseViewer):
         self.selection_info.value = self.create_selection_info()
 
 
+
+class TrajectoryDataViewer(ipw.VBox):
+    """Viewer class for TrajectoryData object."""
+
+    def __init__(self, trajectory, downloadable=True, **kwargs):
+        import bqplot.pyplot as plt
+
+        # TrajectoryData object from AiiDA
+        self._trajectory = trajectory
+        self._frames = len(self._trajectory.get_stepids())
+        self._structures = [trajectory.get_step_structure(i) for i in range(self._frames)]
+
+        # Plot object.
+        self._plot = plt.figure(title="plot", layout={"width": "99%"})
+
+        # Trajectory navigator.
+        self._step_selector = ipw.IntSlider(
+            value=0,
+            min=0,
+            max=self._frames - 1,
+        )
+        self._step_selector.observe(self.update_selection, names="value")
+
+        # Property to plot.
+        self._property_selector = ipw.Dropdown(
+            options=trajectory.get_arraynames(),
+            value='energy',
+            description="Value to plot:",
+        )
+        self._property_selector.observe(self.update_all, names="value")
+
+        # Preparing scales.
+        x_data = self._trajectory.get_stepids()
+
+        self._plot_line = plt.plot(x_data, self._trajectory.get_array(self._property_selector.value)[:len(x_data)])
+        self._plot_circle = plt.scatter(x_data, self._trajectory.get_array(self._property_selector.value)[:len(x_data)])
+
+        on_plot_click_global = self.update_selection_from_plot
+
+        def update_selection(self, change):
+            on_plot_click_global(self, change)
+
+        self._plot_circle.on_element_click(update_selection)
+
+        self._plot_select_circle = plt.scatter(
+            [self._trajectory.get_stepids()[self._step_selector.value]],
+            [self._trajectory.get_array(self._property_selector.value)[self._step_selector.value]],
+            stroke='red',
+        )
+
+        self._plot.axes[1].tick_format = "0.3g"
+        self.message = ipw.HTML()
+
+        # Structure viewer.
+        self._struct_viewer = StructureDataViewer(self._structures,
+                                                  downloadable=downloadable,
+                                                  configure_view=False,
+                                                  layout={"width": "50%"})
+
+        children = [
+            ipw.HBox([self._struct_viewer,
+                      ipw.VBox([self._plot, self._property_selector], layout={"width": "50%"})]),
+            self._step_selector,
+            self.message,
+        ]
+
+        super().__init__(children, **kwargs)
+
+    def update_all(self, change=None):  # pylint: disable=unused-argument
+        """Update the data plot."""
+        x_data = self._trajectory.get_stepids()
+
+        self._plot_circle.x = x_data
+        self._plot_circle.y = self._trajectory.get_array(self._property_selector.value)[:len(x_data)]
+
+        self._plot_line.x = x_data
+        self._plot_line.y = self._trajectory.get_array(self._property_selector.value)[:len(x_data)]
+
+        self.update_selection()
+
+    def update_selection(self, change=None):  # pylint: disable=unused-argument
+        """Update selected point only."""
+        self._struct_viewer.frame = self._step_selector.value
+        self._plot_select_circle.x = [self._trajectory.get_stepids()[self._step_selector.value]]
+        self._plot_select_circle.y = [
+            self._trajectory.get_array(self._property_selector.value)[self._step_selector.value]
+        ]
+
+    def update_selection_from_plot(self, _, selected_point):
+        self._step_selector.value = selected_point['data']['index']
+
+
 class FolderDataViewer(ipw.VBox):
     """Viewer class for FolderData object.
 
@@ -694,4 +786,5 @@ AIIDA_VIEWER_MAPPING = {
     'data.cif.CifData.': StructureDataViewer,
     'data.folder.FolderData.': FolderDataViewer,
     'data.array.bands.BandsData.': BandsDataViewer,
+    'data.array.trajectory.TrajectoryData.': TrajectoryDataViewer,
 }
