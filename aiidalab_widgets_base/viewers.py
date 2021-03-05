@@ -6,7 +6,7 @@ import warnings
 import numpy as np
 from numpy.linalg import norm
 import ipywidgets as ipw
-from IPython.display import display
+from IPython.display import display, Javascript
 import nglview
 from ase import Atoms
 from ase import neighborlist
@@ -316,7 +316,23 @@ class _StructureDataBaseViewer(ipw.VBox):
             children=[ipw.Label("Render an image with POVRAY:"), self.render_btn]
         )
 
-        return ipw.VBox([self.download_box, self.screenshot_box, self.render_box])
+        # 4. Export to ELN.
+        self.export_eln_btn = ipw.Button(description="Export to ELN", icon="vials")
+
+        def export_to_eln(_=None):
+            url = "https://aiidalab-demo.materialscloud.org/user/aliaksandr.yakutovich@epfl.ch/apps/apps/aiidalab-widgets-base/eln.ipynb?uuid=898f086f-ba37-4848-908f-ece74fc46af3&appmode_scroll=0"
+            display(Javascript('window.open("{url}");'.format(url=url)))
+
+        self.export_eln_btn.on_click(export_to_eln)
+
+        return ipw.VBox(
+            [
+                self.download_box,
+                self.screenshot_box,
+                self.render_box,
+                self.export_eln_btn,
+            ]
+        )
 
     def _render_structure(self, change=None):
         """Render the structure with POVRAY."""
