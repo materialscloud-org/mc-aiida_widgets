@@ -320,7 +320,7 @@ class _StructureDataBaseViewer(ipw.VBox):
         self.export_eln_btn = ipw.Button(description="Export to ELN", icon="vials")
 
         def export_to_eln(_=None):
-            url = "https://aiidalab-demo.materialscloud.org/user/aliaksandr.yakutovich@epfl.ch/apps/apps/aiidalab-widgets-base/eln.ipynb?uuid=898f086f-ba37-4848-908f-ece74fc46af3&appmode_scroll=0"
+            url = f"https://aiidalab-demo.materialscloud.org/user-redirect/apps/apps/aiidalab-widgets-base/eln_export.ipynb?uuid={self.structure_uuid}"
             display(Javascript('window.open("{url}");'.format(url=url)))
 
         self.export_eln_btn.on_click(export_to_eln)
@@ -600,6 +600,7 @@ class StructureDataViewer(_StructureDataBaseViewer):
     displayed_structure = Instance(Atoms, allow_none=True, read_only=True)
 
     def __init__(self, structure=None, **kwargs):
+        self.structure_uuid = None
         super().__init__(**kwargs)
         self.structure = structure
         # self.supercell.observe(self.repeat, names='value')
@@ -615,11 +616,14 @@ class StructureDataViewer(_StructureDataBaseViewer):
         structure = change["value"]
 
         if structure is None:
+            self.structure_uuid = None
             return None  # if no structure provided, the rest of the code can be skipped
 
         if isinstance(structure, Atoms):
+            self.structure_uuid = None
             return structure
         if isinstance(structure, Node):
+            self.structure_uuid = structure.uuid
             return structure.get_ase()
         raise ValueError(
             "Unsupported type {}, structure must be one of the following types: "

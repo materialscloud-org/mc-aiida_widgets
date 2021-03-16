@@ -9,6 +9,8 @@ TEMPLATE = """
   <th style="text-align:center">Codes and computers.</th>
   <th style="width:70px" rowspan=2></th>
   <th style="text-align:center">Processes.</th>
+  <th style="width:70px" rowspan=2></th>
+  <th style="text-align:center">Electronic Lab Notebook.</th>
 <tr>
   <td valign="top"><ul>
     <li><a href="{appbase}/structures.ipynb" target="_blank">Dealing with one structure</a></li>
@@ -22,6 +24,10 @@ TEMPLATE = """
   <td valign="top"><ul>
     <li><a href="{appbase}/process_list.ipynb" target="_blank">Process list</a></li>
     <li><a href="{appbase}/process.ipynb" target="_blank">Follow a process</a></li>
+  </ul></td>
+  <td valign="top"><ul>
+    <li><a href="{appbase}/eln_import.ipynb" target="_blank">Import from ELN</a></li>
+    <li><a href="{appbase}/eln_export.ipynb" target="_blank">Export to ELN</a></li>
   </ul></td>
 </tr>
 </table>
