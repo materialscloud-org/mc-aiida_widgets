@@ -3,16 +3,15 @@ import ipywidgets as ipw
 from aiida.orm import load_node
 import traitlets
 from aiida.plugins import DataFactory
-import urllib.parse as urlparse
 from cheminfopy import Sample
 from aiida.orm import Node, QueryBuilder
-from IPython.display import clear_output, display, Javascript
+from IPython.display import clear_output, display
+from aiidalab_widgets_base import viewer
 
 import tempfile
 import json
 from pathlib import Path
 
-from .viewers import viewer
 
 TOKEN_FILE_PATH = Path(tempfile.gettempdir()) / "aiidalab-eln-tokens.json"
 
@@ -43,64 +42,34 @@ def update_token(token_type, uuid, token):
         json.dump(tokens, file, indent=4)
 
 
-class ElnImportWidget(ipw.VBox):
+class AppIcon:
+    def __init__(self, icon, link, description):
+        self.icon = icon
+        self.link = link
+        self.description = description
 
+    def to_html_string(self):
+        return f"""
+            <table style="border-collapse:separate;border-spacing:15px;">
+            <tr>
+                <td style="width:200px"> <a href="{self.link}" target="_blank">  <img src="{self.icon}"> </a></td>
+                <td style="width:800px"> <p style="font-size:16px;">{self.description} </p></td>
+            </tr>
+            </table>
+            """
+
+
+class DisplayAiidaObject(ipw.VBox):
     node = traitlets.Instance(Node, allow_none=True)
 
-    def __init__(self, url, **kwargs):
+    def __init__(self, **kwargs):
         self._output = ipw.Output()
-        self.node = self.eln_import(url)
-
-        self.btn_store = ipw.Button(description="Store in AiiDA")
-        self.btn_store.on_click(self.store_node)
-
-        self.btn_send_to_app = ipw.Button(description="Open in an App.", disabled=True)
-        self.btn_send_to_app.on_click(self.send_to_app)
-
-        self.select_app = ipw.Dropdown(
-            options=[
-                ("lsmo/optimization", "../aiidalab-lsmo/multistage_geo_opt_ddec.ipynb"),
-                ("QE", "../quantum-espresso/qe.ipynb"),
+        super().__init__(
+            children=[
+                self._output,
             ],
-            disabled=True,
+            **kwargs,
         )
-
-        self.user_output = ipw.HTML("")
-
-        children = [
-            self._output,
-            ipw.HBox([self.btn_store, self.user_output]),
-            ipw.HBox([self.btn_send_to_app, self.select_app]),
-        ]
-        super().__init__(children=children, **kwargs)
-
-    def eln_import(self, url, object_type="cif"):
-        object_type = DataFactory(object_type)
-        url = urlparse.urlsplit(url)
-
-        try:
-            parsed_url = urlparse.parse_qs(url.query)
-            self.eln_instance = parsed_url["instance"][0]
-            self.sample_uuid = parsed_url["sample_uuid"][0]
-            self.spectrum_type = parsed_url["spectrum_type"][0]
-            self.file_name = parsed_url["name"][0]
-        except KeyError:
-            return None
-
-        if "sample_token" in parsed_url:
-            sample_token = parsed_url["sample_token"][0]
-            update_token("sample", self.sample_uuid, sample_token)
-        else:
-            sample_token = get_token("sample", self.sample_uuid)
-
-        sample = Sample(
-            instance=self.eln_instance, sample_uuid=self.sample_uuid, token=sample_token
-        )
-        content = sample.get_spectrum(
-            spectrum_type=self.spectrum_type, name=self.file_name
-        )
-        file = io.BytesIO(bytes(content, "utf8"))
-        return object_type(file=file)
 
     @traitlets.observe("node")
     def _observe_node(self, change):
@@ -110,23 +79,101 @@ class ElnImportWidget(ipw.VBox):
                 if change["new"]:
                     display(viewer(change["new"]))
 
-    def store_node(self, _=None):
+
+class ElnImportWidget(ipw.VBox):
+
+    node = traitlets.Instance(Node, allow_none=True)
+
+    def __init__(self, **kwargs):
+
+        eln_instance = kwargs["eln_instance"] if "eln_instance" in kwargs else None
+        sample_uuid = kwargs["sample_uuid"] if "sample_uuid" in kwargs else None
+        spectrum_type = kwargs["spectrum_type"] if "spectrum_type" in kwargs else None
+        file_name = kwargs["file_name"] if "file_name" in kwargs else None
+
+        if "sample_token" in kwargs:
+            sample_token = kwargs["sample_token"]
+            update_token("sample", sample_uuid, sample_token)
+        else:
+            sample_token = get_token("sample", sample_uuid)
+
+        # Importing the object:
+        object_type = DataFactory("cif")
+        sample = Sample(
+            instance=eln_instance, sample_uuid=sample_uuid, token=sample_token
+        )
+        content = sample.get_spectrum(spectrum_type=spectrum_type, name=file_name)
+        file = io.BytesIO(bytes(content, "utf8"))
+        self.node = object_type(file=file)
+
         eln_info = {
-            "eln_instance": self.eln_instance,
-            "sample_uuid": self.sample_uuid,
-            "spectrum_type": self.spectrum_type,
-            "file_name": self.file_name,
+            "eln_instance": eln_instance,
+            "sample_uuid": sample_uuid,
+            "spectrum_type": spectrum_type,
+            "file_name": file_name,
         }
         self.node.set_extra("eln", eln_info)
         self.node.store()
-        self.user_output.value = "Stored in AiiDA [{}]".format(self.node)
-        self.btn_send_to_app.disabled = False
-        self.select_app.disabled = False
 
-    def send_to_app(self, _=None):
-        app = self.select_app.value
-        url = f"https://aiidalab-demo.materialscloud.org/user-redirect/apps/apps/aiidalab-widgets-base/{app}?structure_uuid={self.node.uuid}"
-        display(Javascript(f'window.open("{url}");'))
+
+class OpenInApp(ipw.VBox):
+
+    node = traitlets.Instance(Node, allow_none=True)
+
+    def __init__(self, **kwargs):
+        self.tab = ipw.Tab()
+        super().__init__(children=[self.tab], **kwargs)
+
+    @traitlets.observe("node")
+    def _observe_node(self, change):
+        if change["new"]:
+            self.tab.children = [
+                self.get_geo_opt_tab(),
+                self.get_isotherm_tab(),
+                self.get_geometry_analysis_tab(),
+            ]
+            self.tab.set_title(0, "Geometry Optimization")
+            self.tab.set_title(1, "Isotherm")
+            self.tab.set_title(2, "Geometry analysis")
+        else:
+            self.tab.children = []
+
+    def get_geo_opt_tab(self):
+        geo_opt = ipw.HTML("")
+
+        geo_opt.value += AppIcon(
+            icon="https://gitlab.com/QEF/q-e/raw/develop/logo.jpg",
+            link=f"https://aiidalab-demo.materialscloud.org/user-redirect/apps/apps/quantum-espresso/qe.ipynb?structure_uuid={self.node.uuid}",
+            description="Optimize atomic positions and/or unit cell employing Quantum ESPRESSO. Quantum ESPRESSO is preferable for small structures with no cell dimensions larger than 15 Å. Additionally, you can choose to compute electronic properties of the material such as band structure and density of states.",
+        ).to_html_string()
+
+        geo_opt.value += AppIcon(
+            icon="https://raw.githubusercontent.com/lsmo-epfl/aiidalab-epfl-lsmo/develop/miscellaneous/logos/LSMO.png",
+            link=f"https://aiidalab-demo.materialscloud.org/user-redirect/apps/apps/aiidalab-lsmo/multistage_geo_opt_ddec.ipynb?structure_uuid={self.node.uuid}",
+            description="Optimize atomic positions and unit cell with CP2K. CP2K is very efficient for large and/or porous structures. A structure is considered large when any cell dimension is larger than 15 Å. Additionally, you can choose to assign point charges to the atoms using DDEC.",
+        ).to_html_string()
+
+        return geo_opt
+
+    def get_isotherm_tab(self):
+        isotherm = ipw.HTML()
+        isotherm.value += AppIcon(
+            icon="https://raw.githubusercontent.com/lsmo-epfl/aiidalab-epfl-lsmo/develop/miscellaneous/logos/LSMO.png",
+            link=f"https://aiidalab-demo.materialscloud.org/user-redirect/apps/apps/aiidalab-lsmo/compute_isotherm.ipynb?structure_uuid={self.node.uuid}",
+            description="Compute adsorption isotherm of the selected material using the RASPA code. Typically, one needs to optimize geometry and compute the charges of material before isotherm. However, if this is already done, you can go for it.",
+        ).to_html_string()
+
+        return isotherm
+
+    def get_geometry_analysis_tab(self):
+        geo_analysis = ipw.HTML()
+        geo_analysis.value += AppIcon(
+            icon="https://raw.githubusercontent.com/lsmo-epfl/aiidalab-epfl-lsmo/develop/miscellaneous/logos/LSMO.png",
+            link=f"https://aiidalab-demo.materialscloud.org/user-redirect/apps/apps/aiidalab-lsmo/pore_analysis.ipynb?structure_uuid={self.node.uuid}",
+            description="Perform geometry analysis of a material employing Zeo++ code.",
+        ).to_html_string()
+
+        return geo_analysis
 
 
 class ElnExportWidget(ipw.VBox):
