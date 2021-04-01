@@ -98,22 +98,25 @@ class ElnImportWidget(ipw.VBox):
             sample_token = get_token("sample", sample_uuid)
 
         # Importing the object:
-        object_type = DataFactory("cif")
-        sample = Sample(
-            instance=eln_instance, sample_uuid=sample_uuid, token=sample_token
-        )
-        content = sample.get_spectrum(spectrum_type=spectrum_type, name=file_name)
-        file = io.BytesIO(bytes(content, "utf8"))
-        self.node = object_type(file=file)
+        if eln_instance and sample_uuid and sample_token:
+            object_type = DataFactory("cif")
+            sample = Sample(
+                instance=eln_instance, sample_uuid=sample_uuid, token=sample_token
+            )
+            content = sample.get_spectrum(spectrum_type=spectrum_type, name=file_name)
+            file = io.BytesIO(bytes(content, "utf8"))
+            self.node = object_type(file=file)
 
-        eln_info = {
-            "eln_instance": eln_instance,
-            "sample_uuid": sample_uuid,
-            "spectrum_type": spectrum_type,
-            "file_name": file_name,
-        }
-        self.node.set_extra("eln", eln_info)
-        self.node.store()
+            eln_info = {
+                "eln_instance": eln_instance,
+                "sample_uuid": sample_uuid,
+                "spectrum_type": spectrum_type,
+                "file_name": file_name,
+            }
+            self.node.set_extra("eln", eln_info)
+            self.node.store()
+        else:
+            self.node = None
 
 
 class OpenInApp(ipw.VBox):
@@ -122,19 +125,43 @@ class OpenInApp(ipw.VBox):
 
     def __init__(self, **kwargs):
         self.tab = ipw.Tab()
-        super().__init__(children=[self.tab], **kwargs)
+        self.tab_selection = ipw.RadioButtons(
+            options=[],
+            description="",
+            disabled=False,
+            style={"description_width": "initial"},
+            layout=ipw.Layout(width="auto"),
+        )
+        spacer = ipw.HTML("""<p style="margin-bottom:1cm;"></p>""")
+        super().__init__(children=[self.tab_selection, spacer, self.tab], **kwargs)
 
     @traitlets.observe("node")
     def _observe_node(self, change):
         if change["new"]:
             self.tab.children = [
                 self.get_geo_opt_tab(),
-                self.get_isotherm_tab(),
                 self.get_geometry_analysis_tab(),
+                self.get_isotherm_tab(),
             ]
             self.tab.set_title(0, "Geometry Optimization")
-            self.tab.set_title(1, "Isotherm")
-            self.tab.set_title(2, "Geometry analysis")
+            self.tab.set_title(1, "Geometry analysis")
+            self.tab.set_title(2, "Isotherm")
+
+            self.tab_selection.options = [
+                (
+                    "Geometry Optimization - typically this is the first step needed to find optimal positions of atoms in the unit cell.",
+                    0,
+                ),
+                (
+                    "Geometry analysis - calculate parameters describing the geometry of a porous material.",
+                    1,
+                ),
+                (
+                    "Isotherm - compute adsorption isotherm of a small molecules in the selected material. ",
+                    2,
+                ),
+            ]
+            ipw.link((self.tab, "selected_index"), (self.tab_selection, "value"))
         else:
             self.tab.children = []
 
