@@ -91,7 +91,7 @@ class StructureManagerWidget(ipw.VBox):
             self.viewer = viewer
         else:
             self.viewer = StructureDataViewer(downloadable=False)
-        dlink((self, "structure"), (self.viewer, "structure"))
+        dlink((self, "structure_node"), (self.viewer, "structure"))
 
         # Store button.
         self.btn_store = ipw.Button(description="Store in AiiDA", disabled=True)

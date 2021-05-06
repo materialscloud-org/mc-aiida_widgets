@@ -130,8 +130,9 @@ class DictViewer(ipw.VBox):
             href="data:text/csv;base64,{payload}" target="_blank">{title}</a>"""
             self.value += to_add.format(filename=fname, payload=payload, title=fname)
 
-        super().__init__([self.widget], **kwargs)
+        self.value += f"""<p><a href="https://aiidalab-demo.materialscloud.org/user-redirect/apps/apps/aiidalab-widgets-base/eln_export.ipynb?uuid={parameter.uuid}" target="_blank"> <button>Export to ELN</button></a></p>"""
 
+        super().__init__([self.widget], **kwargs)
 
 class _StructureDataBaseViewer(ipw.VBox):
     """Base viewer class for AiiDA structure or trajectory objects.
