@@ -1,12 +1,12 @@
 import io
 import ipywidgets as ipw
-from aiida.orm import load_node
 import traitlets
 from aiida.plugins import DataFactory
-from cheminfopy import Sample
 from aiida.orm import Node, QueryBuilder
 from IPython.display import clear_output, display
-from aiidalab_widgets_base import viewer
+
+from traitlets import observe
+from aiidalab_eln.uploader import object_uploader
 
 import tempfile
 import json
@@ -73,6 +73,8 @@ class DisplayAiidaObject(ipw.VBox):
 
     @traitlets.observe("node")
     def _observe_node(self, change):
+        from aiidalab_widgets_base import viewer
+
         if change["new"] != change["old"]:
             with self._output:
                 clear_output()
@@ -85,6 +87,7 @@ class ElnImportWidget(ipw.VBox):
     node = traitlets.Instance(Node, allow_none=True)
 
     def __init__(self, **kwargs):
+        from cheminfopy import Sample
 
         eln_instance = kwargs["eln_instance"] if "eln_instance" in kwargs else None
         sample_uuid = kwargs["sample_uuid"] if "sample_uuid" in kwargs else None
@@ -204,8 +207,9 @@ class OpenInApp(ipw.VBox):
 
 
 class ElnExportWidget(ipw.VBox):
-    def __init__(self, uuid, **kwargs):
-        self.node = load_node(uuid)
+    node = traitlets.Instance(Node, allow_none=True)
+
+    def __init__(self, **kwargs):
         self.eln_instance = ipw.Text(
             description="ELN:",
             value="",
@@ -216,14 +220,9 @@ class ElnExportWidget(ipw.VBox):
             value="",
             style={"description_width": "initial"},
         )
-        self.spectrum_type = ipw.Text(
-            description="Spectrum Type:",
-            value="",
-            style={"description_width": "initial"},
-        )
         self.file_name = ipw.Text(
             description="File name:",
-            value=self.node.uuid,
+            value="",
             style={"description_width": "initial"},
         )
         self.token = ipw.Text(
@@ -232,29 +231,24 @@ class ElnExportWidget(ipw.VBox):
             style={"description_width": "initial"},
         )
 
-        title = ipw.HTML("<h3>Export to ELN:</h3>")
-
         self.send = ipw.Button(description="Send to ELN")
         self.send.on_click(self.send_to_eln)
-
-        vwr = viewer(self.node)
-
-        self.parse_node()
-
+        self.modify_settings = ipw.Checkbox(
+            description="Modify ELN settings.", indent=False
+        )
+        self.modify_settings.observe(self.handle_output, "value")
+        self._output = ipw.Output()
         children = [
-            vwr,
-            title,
-            self.eln_instance,
-            self.sample_uuid,
-            self.file_name,
-            self.token,
-            self.send,
+            ipw.HBox([self.send, self.modify_settings]),
+            self._output,
         ]
         super().__init__(children=children, **kwargs)
 
-    def parse_node(self):
-        node = self.node
-        info = {}
+    @observe("node")
+    def _observe_node(self, _=None):
+        if self.node is None:
+            return
+
         if "eln" in self.node.extras:
             info = self.node.extras["eln"]
         else:
@@ -266,32 +260,50 @@ class ElnExportWidget(ipw.VBox):
                     project="extras.eln",
                 )
                 q.append(
-                    Node, filters={"uuid": node.uuid}, with_ancestors="source_node"
+                    Node, filters={"uuid": self.node.uuid}, with_ancestors="source_node"
                 )
                 info = q.all(flat=True)[0]
             except IndexError:
-                pass
-        if info:
-            self.eln_instance.value = info["eln_instance"]
-            self.sample_uuid.value = info["sample_uuid"]
-            self.spectrum_type.value = info["spectrum_type"]
-            self.token.value = get_token("sample", info["sample_uuid"])
+                info = {}
+
+        self.eln_instance.value = info["eln_instance"] if "eln_instance" in info else ""
+        self.sample_uuid.value = info["sample_uuid"] if "sample_uuid" in info else ""
+        self.file_name.value = self.node.uuid
+        if "sample_uuid" in info:
+            self.token.value = get_token("sample", info["sample_uuid"]) or ""
+        else:
+            self.token.value = ""
 
     def send_to_eln(self, _=None):
-        sample = Sample(
-            self.eln_instance.value,
+
+        if (
+            not self.eln_instance.value
+            or not self.sample_uuid.value
+            or not self.token.value
+            or not self.token.value
+            or not self.file_name.value
+        ):
+            self.modify_settings.value = True
+
+        object_uploader(
+            self.node,
+            eln_instance=self.eln_instance.value,
             sample_uuid=self.sample_uuid.value,
             token=self.token.value,
+            filename=self.file_name.value,
         )
 
-        source_info = {
-            "uuid": self.node.uuid,
-            "url": "https://aiidalab-demo.materialscloud.org/hub/login",
-            "name": "Isotherm simulated using the isotherm app on AiiDAlab",
-        }
-        sample.put_spectrum(
-            spectrum_type=self.spectrum_type.value,
-            name=self.file_name.value,
-            filecontent=self.node.get_content(),
-            source_info=source_info,
-        )
+    def handle_output(self, _=None):
+        with self._output:
+            clear_output()
+            if self.modify_settings.value:
+                display(
+                    ipw.VBox(
+                        [
+                            self.eln_instance,
+                            self.sample_uuid,
+                            self.file_name,
+                            self.token,
+                        ]
+                    )
+                )

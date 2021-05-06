@@ -40,7 +40,7 @@ from aiida.orm import Node
 from .utils import string_range_to_list, list_to_string_range
 from .dicts import Colors, Radius
 from .misc import CopyToClipboardButton, ReversePolishNotation
-
+from .elns import ElnExportWidget
 
 AIIDA_VIEWER_MAPPING = dict()
 
@@ -84,13 +84,14 @@ def viewer(obj, downloadable=True, **kwargs):
 @register_viewer_widget("data.dict.Dict.")
 class DictViewer(ipw.VBox):
 
-    value = Unicode()
     """Viewer class for Dict object.
 
     :param parameter: Dict object to be viewed
     :type parameter: Dict
     :param downloadable: If True, add link/button to download the content of the object
     :type downloadable: bool"""
+
+    value = Unicode()
 
     def __init__(self, parameter, downloadable=True, **kwargs):
         import pandas as pd
@@ -130,9 +131,8 @@ class DictViewer(ipw.VBox):
             href="data:text/csv;base64,{payload}" target="_blank">{title}</a>"""
             self.value += to_add.format(filename=fname, payload=payload, title=fname)
 
-        self.value += f"""<p><a href="https://aiidalab-demo.materialscloud.org/user-redirect/apps/apps/aiidalab-widgets-base/eln_export.ipynb?uuid={parameter.uuid}" target="_blank"> <button>Export to ELN</button></a></p>"""
+        super().__init__([self.widget, ElnExportWidget(node=parameter)], **kwargs)
 
-        super().__init__([self.widget], **kwargs)
 
 class _StructureDataBaseViewer(ipw.VBox):
     """Base viewer class for AiiDA structure or trajectory objects.
@@ -318,20 +318,14 @@ class _StructureDataBaseViewer(ipw.VBox):
         )
 
         # 4. Export to ELN.
-        self.export_eln_btn = ipw.Button(description="Export to ELN", icon="vials")
-
-        def export_to_eln(_=None):
-            url = f"https://aiidalab-demo.materialscloud.org/user-redirect/apps/apps/aiidalab-widgets-base/eln_export.ipynb?uuid={self.structure_uuid}"
-            display(Javascript('window.open("{url}");'.format(url=url)))
-
-        self.export_eln_btn.on_click(export_to_eln)
+        self.export_eln = ElnExportWidget()
 
         return ipw.VBox(
             [
                 self.download_box,
                 self.screenshot_box,
                 self.render_box,
-                self.export_eln_btn,
+                self.export_eln,
             ]
         )
 
@@ -551,7 +545,6 @@ class _StructureDataBaseViewer(ipw.VBox):
     @staticmethod
     def _download(payload, filename):
         """Download payload as a file named as filename."""
-        from IPython.display import Javascript
 
         javas = Javascript(
             """
@@ -604,6 +597,8 @@ class StructureDataViewer(_StructureDataBaseViewer):
         self.structure_uuid = None
         super().__init__(**kwargs)
         self.structure = structure
+        # ipw.dlink((self, "structure"), (self.export_eln, "node"))
+        self.export_eln.node = structure
         # self.supercell.observe(self.repeat, names='value')
 
     @observe("supercell")
@@ -936,7 +931,6 @@ class FolderDataViewer(ipw.VBox):
 
     def download(self, change=None):  # pylint: disable=unused-argument
         """Prepare for downloading."""
-        from IPython.display import Javascript
 
         payload = base64.b64encode(
             self._folder.get_object_content(self.files.value).encode()
