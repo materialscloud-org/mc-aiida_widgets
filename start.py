@@ -27,7 +27,6 @@ TEMPLATE = """
   </ul></td>
   <td valign="top"><ul>
     <li><a href="{appbase}/eln_import.ipynb" target="_blank">Import from ELN</a></li>
-    <li><a href="{appbase}/eln_export.ipynb" target="_blank">Export to ELN</a></li>
   </ul></td>
 </tr>
 </table>
