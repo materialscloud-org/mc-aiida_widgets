@@ -6,7 +6,7 @@ from aiida.orm import Node, QueryBuilder
 from IPython.display import clear_output, display
 
 from traitlets import observe
-from aiidalab_eln.uploader import object_uploader
+from aiidalab_eln.exporter import object_exporter
 
 import tempfile
 import json
@@ -112,6 +112,7 @@ class ElnImportWidget(ipw.VBox):
 
             eln_info = {
                 "eln_instance": eln_instance,
+                "eln_type": "cheminfo",
                 "sample_uuid": sample_uuid,
                 "spectrum_type": spectrum_type,
                 "file_name": file_name,
@@ -287,7 +288,7 @@ class ElnExportWidget(ipw.VBox):
                 print("Please provide the missing parameters!")
             return
 
-        object_uploader(
+        object_exporter(
             self.node,
             eln_instance=self.eln_instance.value,
             sample_uuid=self.sample_uuid.value,
