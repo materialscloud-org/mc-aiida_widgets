@@ -280,10 +280,12 @@ class ElnExportWidget(ipw.VBox):
             not self.eln_instance.value
             or not self.sample_uuid.value
             or not self.token.value
-            or not self.token.value
             or not self.file_name.value
         ):
             self.modify_settings.value = True
+            with self._output:
+                print("Please provide the missing parameters!")
+            return
 
         object_uploader(
             self.node,
