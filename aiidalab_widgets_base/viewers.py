@@ -6,7 +6,7 @@ import warnings
 import numpy as np
 from numpy.linalg import norm
 import ipywidgets as ipw
-from IPython.display import display
+from IPython.display import display, Javascript
 import nglview
 from ase import Atoms
 from ase import neighborlist
@@ -40,7 +40,7 @@ from aiida.orm import Node
 from .utils import string_range_to_list, list_to_string_range
 from .dicts import Colors, Radius
 from .misc import CopyToClipboardButton, ReversePolishNotation
-
+from .elns import ElnExportWidget
 
 AIIDA_VIEWER_MAPPING = dict()
 
@@ -84,13 +84,14 @@ def viewer(obj, downloadable=True, **kwargs):
 @register_viewer_widget("data.dict.Dict.")
 class DictViewer(ipw.VBox):
 
-    value = Unicode()
     """Viewer class for Dict object.
 
     :param parameter: Dict object to be viewed
     :type parameter: Dict
     :param downloadable: If True, add link/button to download the content of the object
     :type downloadable: bool"""
+
+    value = Unicode()
 
     def __init__(self, parameter, downloadable=True, **kwargs):
         import pandas as pd
@@ -130,7 +131,7 @@ class DictViewer(ipw.VBox):
             href="data:text/csv;base64,{payload}" target="_blank">{title}</a>"""
             self.value += to_add.format(filename=fname, payload=payload, title=fname)
 
-        super().__init__([self.widget], **kwargs)
+        super().__init__([self.widget, ElnExportWidget(node=parameter)], **kwargs)
 
 
 class _StructureDataBaseViewer(ipw.VBox):
@@ -316,7 +317,17 @@ class _StructureDataBaseViewer(ipw.VBox):
             children=[ipw.Label("Render an image with POVRAY:"), self.render_btn]
         )
 
-        return ipw.VBox([self.download_box, self.screenshot_box, self.render_box])
+        # 4. Export to ELN.
+        self.export_eln = ElnExportWidget()
+
+        return ipw.VBox(
+            [
+                self.download_box,
+                self.screenshot_box,
+                self.render_box,
+                self.export_eln,
+            ]
+        )
 
     def _render_structure(self, change=None):
         """Render the structure with POVRAY."""
@@ -534,7 +545,6 @@ class _StructureDataBaseViewer(ipw.VBox):
     @staticmethod
     def _download(payload, filename):
         """Download payload as a file named as filename."""
-        from IPython.display import Javascript
 
         javas = Javascript(
             """
@@ -584,8 +594,11 @@ class StructureDataViewer(_StructureDataBaseViewer):
     displayed_structure = Instance(Atoms, allow_none=True, read_only=True)
 
     def __init__(self, structure=None, **kwargs):
+        self.structure_uuid = None
         super().__init__(**kwargs)
         self.structure = structure
+        # ipw.dlink((self, "structure"), (self.export_eln, "node"))
+        self.export_eln.node = structure
         # self.supercell.observe(self.repeat, names='value')
 
     @observe("supercell")
@@ -599,11 +612,14 @@ class StructureDataViewer(_StructureDataBaseViewer):
         structure = change["value"]
 
         if structure is None:
+            self.structure_uuid = None
             return None  # if no structure provided, the rest of the code can be skipped
 
         if isinstance(structure, Atoms):
+            self.structure_uuid = None
             return structure
         if isinstance(structure, Node):
+            self.structure_uuid = structure.uuid
             return structure.get_ase()
         raise ValueError(
             "Unsupported type {}, structure must be one of the following types: "
@@ -915,7 +931,6 @@ class FolderDataViewer(ipw.VBox):
 
     def download(self, change=None):  # pylint: disable=unused-argument
         """Prepare for downloading."""
-        from IPython.display import Javascript
 
         payload = base64.b64encode(
             self._folder.get_object_content(self.files.value).encode()
